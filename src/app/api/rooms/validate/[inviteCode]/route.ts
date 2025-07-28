@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { serverStorage } from '@/lib/serverStorage'
 
 export async function GET(
   request: NextRequest,
@@ -8,13 +8,8 @@ export async function GET(
   try {
     const { inviteCode } = params
 
-    const room = await prisma.room.findUnique({
-      where: { inviteCode },
-      include: {
-        participants: true,
-        items: true
-      }
-    })
+    const rooms = serverStorage.getRooms()
+    const room = rooms.find((r: any) => r.inviteCode === inviteCode)
 
     if (!room) {
       return NextResponse.json(
@@ -30,13 +25,16 @@ export async function GET(
       )
     }
 
+    // Buscar participantes da sala
+    const participants = serverStorage.getParticipantsByRoom(room.id)
+
     return NextResponse.json({
       room: {
         id: room.id,
         name: room.name,
         inviteCode: room.inviteCode,
-        participants: room.participants,
-        items: room.items
+        participants: participants,
+        items: [] // Por enquanto, não temos items implementados no serverStorage
       }
     })
   } catch (error) {
