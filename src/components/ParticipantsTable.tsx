@@ -93,9 +93,9 @@ export function ParticipantsTable({ participants, roomName, inviteCode, moderato
   }
 
   return (
-    <div className="mb-3 max-w-6xl mx-auto flex flex-col justify-center" style={{ minHeight: '80vh' }}>
+    <div className="mb-3 max-w-6xl mx-auto flex flex-col" style={{ minHeight: '80vh' }}>
       {/* Título principal da aplicação */}
-      <h1 className="text-4xl font-bold text-orange-600 mb-4">
+      <h1 className="text-4xl font-bold text-orange-600 mb-4 mt-0">
         CAPANG-AI
       </h1>
       
@@ -173,9 +173,17 @@ export function ParticipantsTable({ participants, roomName, inviteCode, moderato
               const hasInitialPhoto = participant.photos.some(p => p.type === 'INITIAL')
               const hasFinalPhoto = participant.photos.some(p => p.type === 'FINAL')
               
-              // Calcular posição ao redor da mesa (ajustado para mesa centralizada)
+              // Calcular posição ao redor da mesa (ajustado para cada posição)
               const angle = (index * 360) / participants.length
-              const radius = 220 // Distância do centro (ajustado para mesa centralizada)
+              // Ajustar raio baseado na posição para evitar sobreposição com a mesa
+              let radius = 200 // Base
+              if (angle >= 135 && angle <= 225) {
+                // Posições inferiores (onde estava o avatar 2) - mais longe
+                radius = 240
+              } else if (angle >= 315 || angle <= 45) {
+                // Posições superiores (onde estava o avatar 1) - mais próximo
+                radius = 180
+              }
               const x = Math.cos((angle - 90) * Math.PI / 180) * radius
               const y = Math.sin((angle - 90) * Math.PI / 180) * radius
 
