@@ -93,10 +93,15 @@ export function ParticipantsTable({ participants, roomName, inviteCode, moderato
   }
 
   return (
-    <div className="mb-3">
-      <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+    <div className="mb-3 max-w-6xl mx-auto flex flex-col justify-center" style={{ minHeight: '80vh' }}>
+      {/* Título principal da aplicação */}
+      <h1 className="text-4xl font-bold text-orange-600 mb-4">
+        CAPANG-AI
+      </h1>
+      
+      <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
         <Users className="w-6 h-6" />
-        Mesa dos Capangas
+        Mesa de Combate
         <span className="text-sm text-gray-600 font-normal">
           - Código: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{inviteCode}</span>
         </span>
@@ -122,8 +127,8 @@ export function ParticipantsTable({ participants, roomName, inviteCode, moderato
         )}
       </h2>
       
-      <div className="relative w-full h-96 md:h-[500px] flex items-center justify-center">
-        {/* Mesa */}
+      <div className={`relative w-full flex items-center justify-center px-4 ${showScores ? 'min-h-[600px]' : 'min-h-[500px]'}`} style={{ paddingTop: showScores ? '4rem' : '6rem', paddingBottom: showScores ? '4rem' : '2rem' }}>
+        {/* Mesa - centralizada na tela */}
         <div className="bg-gradient-to-br from-amber-600 to-amber-800 rounded-full mx-auto w-80 h-80 md:w-[420px] md:h-[420px] flex items-center justify-center shadow-lg border-4 border-amber-700 relative z-10">
           <div className="text-center text-white">
             {participants.length > 0 ? (
@@ -168,9 +173,9 @@ export function ParticipantsTable({ participants, roomName, inviteCode, moderato
               const hasInitialPhoto = participant.photos.some(p => p.type === 'INITIAL')
               const hasFinalPhoto = participant.photos.some(p => p.type === 'FINAL')
               
-              // Calcular posição ao redor da mesa
+              // Calcular posição ao redor da mesa (ajustado para mesa centralizada)
               const angle = (index * 360) / participants.length
-              const radius = 200 // Distância do centro (aumentado para afastar mais)
+              const radius = 220 // Distância do centro (ajustado para mesa centralizada)
               const x = Math.cos((angle - 90) * Math.PI / 180) * radius
               const y = Math.sin((angle - 90) * Math.PI / 180) * radius
 
@@ -197,8 +202,8 @@ export function ParticipantsTable({ participants, roomName, inviteCode, moderato
                       }
                     }}
                     onMouseEnter={(e) => {
-                      // Mostrar preview das fotos ao passar o mouse
-                      if (participant.photos.length > 0) {
+                      // Mostrar preview das fotos ao passar o mouse (exceto no próprio avatar)
+                      if (participant.photos.length > 0 && currentParticipantId !== participant.id) {
                         const tooltip = document.createElement('div')
                         tooltip.className = 'fixed z-50 bg-white rounded-lg shadow-xl border p-3 max-w-xs'
                         tooltip.style.left = `${e.clientX + 10}px`

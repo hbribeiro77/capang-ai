@@ -40,7 +40,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
   const [isAnalyzingWithAI, setIsAnalyzingWithAI] = useState(false)
   const [isRevealingScores, setIsRevealingScores] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [debugEnabled, setDebugEnabled] = useState(true)
+  const [debugEnabled, setDebugEnabled] = useState(false)
   const router = useRouter()
 
   // Função para atualizar status da IA no servidor
@@ -758,7 +758,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
 
       {/* Participants Cards - Só mostra quando showScores for true */}
       {showScores && (
-        <div className="card animate-in slide-in-from-bottom-4 duration-500" id="participants-details">
+        <div className="card animate-in slide-in-from-bottom-4 duration-500 mt-8 pt-8" id="participants-details">
           <h2 className="text-2xl font-bold text-gray-800 mb-3 flex items-center gap-2">
             <Users className="w-6 h-6" />
             Detalhes dos Participantes
