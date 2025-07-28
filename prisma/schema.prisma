@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Room {
+  id                String   @id @default(cuid())
+  name              String
+  moderatorName     String
+  createdAt         DateTime @default(now())
+  inviteCode        String   @unique
+  isActive          Boolean  @default(true)
+  aiAnalyzing       Boolean  @default(false)
+  aiAnalysisStartedAt DateTime?
+  scoresRevealed    Boolean  @default(false)
+  scoresRevealedAt  DateTime?
+  aiResults         String?  // JSON string com todas as análises da IA
+  participants      Participant[]
+  items             Item[]
+}
+
+model Participant {
+  id        String   @id @default(cuid())
+  name      String
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id])
+  createdAt DateTime @default(now())
+  photos    Photo[]
+  scores    Score[]
+}
+
+model Item {
+  id          String   @id @default(cuid())
+  name        String
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id])
+  scores      Score[]
+}
+
+model Photo {
+  id            String   @id @default(cuid())
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id])
+  url           String
+  type          String   // INITIAL ou FINAL
+  createdAt     DateTime @default(now())
+}
+
+model Score {
+  id            String   @id @default(cuid())
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id])
+  itemId        String
+  item          Item     @relation(fields: [itemId], references: [id])
+  value         String   // SIMPLE, DUPLO ou TRIPLO
+  createdAt     DateTime @default(now())
+}
+
+ 
