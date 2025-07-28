@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { openai } from '@/lib/openai'
+import { getOpenAI } from '@/lib/openai'
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,6 +96,7 @@ Se o prato estiver muito sujo ou não conseguir avaliar a limpeza, retorne um ar
     console.log('Modelo:', "gpt-4o-mini")
     console.log('URL da imagem:', imageUrl.substring(0, 100) + '...')
 
+    const openai = getOpenAI()
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
