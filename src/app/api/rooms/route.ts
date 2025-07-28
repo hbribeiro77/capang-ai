@@ -1,63 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { generateInviteCode } from '@/lib/utils'
-
-const ITEMS = [
-  'Pão', 'Carne', 'Salada', 'Bacon', 'Ovo', 
-  'Queijo', 'Batata', 'Batata com Bacon', 'Limpeza'
-]
+import { serverStorage } from '@/lib/serverStorage'
 
 export async function POST(request: NextRequest) {
   try {
     const { name, moderatorName } = await request.json()
 
-    if (!name || typeof name !== 'string') {
+    if (!name || !moderatorName) {
       return NextResponse.json(
-        { error: 'Nome da sala é obrigatório' },
+        { error: 'Nome da sala e nome do moderador são obrigatórios' },
         { status: 400 }
       )
     }
 
-    if (!moderatorName || typeof moderatorName !== 'string') {
-      return NextResponse.json(
-        { error: 'Nome do moderador é obrigatório' },
-        { status: 400 }
-      )
-    }
-
-    // Gerar código de convite único
-    const inviteCode = generateInviteCode()
+    // Gerar ID único e código de convite
+    const id = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const inviteCode = Math.random().toString(36).substr(2, 6).toUpperCase()
 
     // Criar sala
-    const room = await prisma.room.create({
-      data: {
-        name,
-        inviteCode,
-        moderatorName,
-        items: {
-          create: ITEMS.map(itemName => ({
-            name: itemName
-          }))
-        },
-        participants: {
-          create: {
-            name: moderatorName
-          }
-        }
-      },
-      include: {
-        participants: true,
-        items: true
-      }
-    })
+    const room = {
+      id,
+      name,
+      moderatorName,
+      inviteCode,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      aiAnalyzing: false,
+      scoresRevealed: false
+    }
 
-    return NextResponse.json({ 
+    // Salvar no serverStorage
+    serverStorage.saveRoom(room)
+
+    // Criar o participante moderador automaticamente
+    const participant = {
+      id: `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: moderatorName,
       roomId: room.id,
+      createdAt: new Date().toISOString()
+    }
+    serverStorage.saveParticipant(participant)
+
+    return NextResponse.json({
+      id: room.id,
+      name: room.name,
+      moderatorName: room.moderatorName,
       inviteCode: room.inviteCode,
-      participantId: room.participants[0].id // ID do moderador
+      isActive: room.isActive,
+      createdAt: room.createdAt,
+      participantId: participant.id
     })
   } catch (error) {
     console.error('Erro ao criar sala:', error)
+    return NextResponse.json(
+      { error: 'Erro interno do servidor' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function GET() {
+  try {
+    const rooms = serverStorage.getRooms()
+    return NextResponse.json(rooms)
+  } catch (error) {
+    console.error('Erro ao buscar salas:', error)
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }

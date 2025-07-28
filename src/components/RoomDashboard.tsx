@@ -15,6 +15,8 @@ interface RoomDashboardProps {
 }
 
 export function RoomDashboard({ roomId }: RoomDashboardProps) {
+  console.log('🔍 RoomDashboard renderizado com roomId:', roomId)
+  
   const [room, setRoom] = useState<Room | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

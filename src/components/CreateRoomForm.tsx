@@ -26,10 +26,20 @@ export function CreateRoomForm() {
       })
 
       if (response.ok) {
-        const { roomId, participantId } = await response.json()
+        const data = await response.json()
+        console.log('Resposta da criação da sala:', data)
+        
+        const roomId = data.id // A API retorna 'id', não 'roomId'
+        const participantId = data.participantId || roomId // Fallback se não houver participantId
+        
+        console.log('RoomId extraído:', roomId)
+        console.log('ParticipantId:', participantId)
+        
         // Salvar o ID do participante moderador no localStorage
         localStorage.setItem(`capangai_participant_${roomId}`, participantId)
         localStorage.setItem(`capangai_participant_name_${roomId}`, moderatorName)
+        
+        console.log('Redirecionando para:', `/room/${roomId}`)
         router.push(`/room/${roomId}`)
       }
     } catch (error) {

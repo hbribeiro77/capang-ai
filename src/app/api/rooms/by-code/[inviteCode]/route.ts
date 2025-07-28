@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { serverStorage } from '@/lib/serverStorage'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { inviteCode: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: { inviteCode: string } }) {
   try {
-    const { inviteCode } = params
+    const inviteCode = params.inviteCode
 
-    const room = await prisma.room.findUnique({
-      where: { inviteCode },
-      select: {
-        id: true,
-        name: true,
-        inviteCode: true,
-        isActive: true
-      }
-    })
+    // Buscar sala pelo código de convite
+    const rooms = serverStorage.getRooms()
+    const room = rooms.find((r: any) => r.inviteCode === inviteCode)
 
     if (!room) {
       return NextResponse.json(
@@ -32,10 +23,13 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ 
-      roomId: room.id,
-      roomName: room.name,
-      inviteCode: room.inviteCode
+    return NextResponse.json({
+      id: room.id,
+      name: room.name,
+      moderatorName: room.moderatorName,
+      inviteCode: room.inviteCode,
+      isActive: room.isActive,
+      createdAt: room.createdAt
     })
   } catch (error) {
     console.error('Erro ao buscar sala por código:', error)

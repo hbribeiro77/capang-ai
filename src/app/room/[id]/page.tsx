@@ -7,6 +7,8 @@ interface RoomPageProps {
 }
 
 export default function RoomPage({ params }: RoomPageProps) {
+  console.log('🔍 RoomPage renderizado com params:', params)
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-100 to-red-100">
       <div className="container mx-auto px-4 py-8">

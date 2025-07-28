@@ -12,7 +12,6 @@
     "db:generate": "prisma generate"
   },
   "dependencies": {
-    "@prisma/client": "^5.7.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
@@ -27,7 +26,6 @@
     "node-fetch": "^3.3.2",
     "openai": "^5.10.2",
     "postcss": "^8",
-    "prisma": "^5.7.1",
     "react": "^18",
     "react-dom": "^18",
     "tailwind-merge": "^2.0.0",

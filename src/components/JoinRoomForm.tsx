@@ -18,10 +18,17 @@ export function JoinRoomForm() {
       // Primeiro, buscar o ID da sala pelo código de convite
       const response = await fetch(`/api/rooms/by-code/${inviteCode}`)
       if (response.ok) {
-        const { roomId } = await response.json()
+        const data = await response.json()
+        console.log('Resposta da busca por código:', data)
+        
+        const roomId = data.id // A API retorna 'id', não 'roomId'
+        console.log('RoomId extraído:', roomId)
+        
         // Redirecionar para a página de registro
         router.push(`/room/${roomId}/join`)
       } else {
+        const errorData = await response.json()
+        console.error('Erro ao buscar sala:', errorData)
         alert('Código de convite inválido!')
       }
     } catch (error) {

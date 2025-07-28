@@ -1,25 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { serverStorage } from '@/lib/serverStorage'
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const roomId = params.id
     const { revealed, aiResults } = await request.json()
     
-    console.log('🔍 POST /reveal-scores - Dados recebidos:')
-    console.log('revealed:', revealed)
-    console.log('aiResults:', aiResults)
-    
-    // Atualizar o status de revelação da sala e salvar resultados da IA
-    await prisma.room.update({
-      where: { id: params.id },
-      data: { 
-        scoresRevealed: revealed,
-        scoresRevealedAt: revealed ? new Date() : null,
-        aiResults: aiResults ? JSON.stringify(aiResults) : null
-      }
-    })
+    // Buscar sala
+    const room = serverStorage.getRoom(roomId)
+    if (!room) {
+      return NextResponse.json(
+        { error: 'Sala não encontrada' },
+        { status: 404 }
+      )
+    }
 
-    console.log('✅ Dados salvos no banco com sucesso')
+    // Atualizar status de revelação
+    const updatedRoom = {
+      ...room,
+      scoresRevealed: revealed,
+      scoresRevealedAt: revealed ? new Date().toISOString() : undefined,
+      aiResults: aiResults ? JSON.stringify(aiResults) : undefined
+    }
+
+    serverStorage.saveRoom(updatedRoom)
+
+    // Salvar resultados da IA separadamente
+    if (aiResults) {
+      serverStorage.saveAIResults(aiResults)
+    }
+
     return NextResponse.json({ success: true, revealed })
   } catch (error) {
     console.error('Erro ao atualizar status de revelação:', error)
@@ -32,11 +42,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const room = await prisma.room.findUnique({
-      where: { id: params.id },
-      select: { scoresRevealed: true, scoresRevealedAt: true, aiResults: true }
-    })
+    const roomId = params.id
 
+    // Buscar sala
+    const room = serverStorage.getRoom(roomId)
     if (!room) {
       return NextResponse.json(
         { error: 'Sala não encontrada' },
@@ -44,18 +53,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       )
     }
 
-    console.log('🔍 GET /reveal-scores - Dados do banco:')
-    console.log('scoresRevealed:', room.scoresRevealed)
-    console.log('scoresRevealedAt:', room.scoresRevealedAt)
-    console.log('aiResults (raw):', room.aiResults)
-    
-    const parsedAiResults = room.aiResults ? JSON.parse(room.aiResults) : null
-    console.log('aiResults (parsed):', parsedAiResults)
+    // Buscar resultados da IA
+    const aiResults = serverStorage.getAIResults()
 
     return NextResponse.json({
       scoresRevealed: room.scoresRevealed || false,
       scoresRevealedAt: room.scoresRevealedAt,
-      aiResults: parsedAiResults
+      aiResults: room.aiResults ? JSON.parse(room.aiResults) : aiResults
     })
   } catch (error) {
     console.error('Erro ao buscar status de revelação:', error)

@@ -29,7 +29,12 @@ export function ParticipantRegistration({ roomId }: ParticipantRegistrationProps
       })
 
       if (response.ok) {
-        const { participantId } = await response.json()
+        const data = await response.json()
+        console.log('Resposta do registro:', data)
+        
+        const participantId = data.id // A API retorna 'id', não 'participantId'
+        console.log('ParticipantId extraído:', participantId)
+        
         // Salvar o ID do participante no localStorage
         localStorage.setItem(`capangai_participant_${roomId}`, participantId)
         localStorage.setItem(`capangai_participant_name_${roomId}`, participantName)

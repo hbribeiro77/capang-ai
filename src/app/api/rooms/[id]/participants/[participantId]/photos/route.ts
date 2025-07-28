@@ -1,33 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { serverStorage } from '@/lib/serverStorage'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string; participantId: string } }
-) {
-  console.log('=== INÍCIO DO UPLOAD DE FOTO ===')
-  console.log('Params:', params)
-  
+export async function POST(request: NextRequest, { params }: { params: { id: string, participantId: string } }) {
   try {
-    const { id: roomId, participantId } = params
-    console.log('RoomId:', roomId, 'ParticipantId:', participantId)
+    const { participantId } = params
+    const formData = await request.formData()
+    const photo = formData.get('photo') as File
+    const type = formData.get('type') as 'INITIAL' | 'FINAL'
 
-    // Verificar se a sala e participante existem
-    const room = await prisma.room.findUnique({
-      where: { id: roomId }
-    })
-
-    if (!room) {
+    if (!photo || !type) {
       return NextResponse.json(
-        { error: 'Sala não encontrada' },
-        { status: 404 }
+        { error: 'Foto e tipo são obrigatórios' },
+        { status: 400 }
       )
     }
 
-    const participant = await prisma.participant.findUnique({
-      where: { id: participantId }
-    })
-
+    // Verificar se o participante existe
+    const participants = serverStorage.getParticipants()
+    const participant = participants.find((p: any) => p.id === participantId)
     if (!participant) {
       return NextResponse.json(
         { error: 'Participante não encontrado' },
@@ -35,83 +25,32 @@ export async function POST(
       )
     }
 
-    // Por enquanto, vamos simular o upload
-    // Em produção, você integraria com Cloudinary ou similar
-    const formData = await request.formData()
-    const photo = formData.get('photo') as File
-    const type = formData.get('type') as string
-    
-    console.log('FormData recebido:')
-    console.log('- Photo:', photo ? 'File presente' : 'File ausente')
-    console.log('- Type:', type)
-
-    if (!photo) {
-      return NextResponse.json(
-        { error: 'Foto é obrigatória' },
-        { status: 400 }
-      )
-    }
-
-    if (!type || !['INITIAL', 'FINAL'].includes(type)) {
-      return NextResponse.json(
-        { error: 'Tipo de foto inválido' },
-        { status: 400 }
-      )
-    }
-
-    // Verificar se já existe uma foto deste tipo para este participante
-    const existingPhoto = await prisma.photo.findFirst({
-      where: {
-        participantId,
-        type
-      }
-    })
-
-    if (existingPhoto) {
-      return NextResponse.json(
-        { error: `Já existe uma foto ${type === 'INITIAL' ? 'inicial' : 'final'} para este participante` },
-        { status: 400 }
-      )
-    }
-
-    // Converter a foto para base64 para usar a imagem real
+    // Converter foto para base64
     const arrayBuffer = await photo.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    const base64 = buffer.toString('base64')
-    const mimeType = photo.type || 'image/jpeg'
-    const photoUrl = `data:${mimeType};base64,${base64}`
-    
-    console.log('Foto convertida para base64, tamanho:', buffer.length, 'bytes')
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+    const dataUrl = `data:${photo.type};base64,${base64}`
 
-    // Salvar a foto no banco
-    const savedPhoto = await prisma.photo.create({
-      data: {
-        participantId,
-        url: photoUrl,
-        type
-      }
-    })
-
-    console.log('Foto salva:', {
-      id: savedPhoto.id,
-      url: savedPhoto.url,
-      type: savedPhoto.type,
-      participantId: savedPhoto.participantId
-    })
-
-    const response = {
-      photoId: savedPhoto.id,
-      url: savedPhoto.url,
-      message: `Foto ${type === 'INITIAL' ? 'inicial' : 'final'} enviada com sucesso!`
+    // Criar foto
+    const photoData = {
+      id: `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      participantId,
+      type,
+      url: dataUrl,
+      createdAt: new Date().toISOString()
     }
-    
-    console.log('Resposta da API:', response)
-    console.log('=== FIM DO UPLOAD DE FOTO ===')
-    
-    return NextResponse.json(response)
 
+    // Salvar no localStorage
+    serverStorage.savePhoto(photoData)
+
+    return NextResponse.json({
+      id: photoData.id,
+      participantId: photoData.participantId,
+      type: photoData.type,
+      url: photoData.url,
+      createdAt: photoData.createdAt
+    })
   } catch (error) {
-    console.error('Erro ao fazer upload da foto:', error)
+    console.error('Erro ao enviar foto:', error)
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }
@@ -119,81 +58,35 @@ export async function POST(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string; participantId: string } }
-) {
-  console.log('=== REMOVENDO FOTO ===')
-  console.log('Params:', params)
-  
+export async function DELETE(request: NextRequest, { params }: { params: { id: string, participantId: string } }) {
   try {
-    const { id: roomId, participantId } = params
-    console.log('RoomId:', roomId, 'ParticipantId:', participantId)
+    const { participantId } = params
+    const { type } = await request.json()
 
-    // Verificar se a sala e participante existem
-    const room = await prisma.room.findUnique({
-      where: { id: roomId }
-    })
-
-    if (!room) {
+    if (!type) {
       return NextResponse.json(
-        { error: 'Sala não encontrada' },
-        { status: 404 }
-      )
-    }
-
-    const participant = await prisma.participant.findUnique({
-      where: { id: participantId }
-    })
-
-    if (!participant) {
-      return NextResponse.json(
-        { error: 'Participante não encontrado' },
-        { status: 404 }
-      )
-    }
-
-    const body = await request.json()
-    const { type } = body
-
-    if (!type || !['INITIAL', 'FINAL'].includes(type)) {
-      return NextResponse.json(
-        { error: 'Tipo de foto inválido' },
+        { error: 'Tipo da foto é obrigatório' },
         { status: 400 }
       )
     }
 
-    // Buscar e remover a foto
-    const photo = await prisma.photo.findFirst({
-      where: {
-        participantId,
-        type
-      }
-    })
+    // Buscar fotos do participante
+    const photos = serverStorage.getPhotosByParticipant(participantId)
+    const photoToDelete = photos.find((p: any) => p.type === type)
 
-    if (!photo) {
+    if (!photoToDelete) {
       return NextResponse.json(
-        { error: `Foto ${type === 'INITIAL' ? 'inicial' : 'final'} não encontrada` },
+        { error: 'Foto não encontrada' },
         { status: 404 }
       )
     }
 
-    await prisma.photo.delete({
-      where: { id: photo.id }
-    })
+    // Deletar foto
+    serverStorage.deletePhoto(photoToDelete.id)
 
-    console.log('Foto removida:', {
-      id: photo.id,
-      type: photo.type,
-      participantId: photo.participantId
-    })
-
-    return NextResponse.json({
-      message: `Foto ${type === 'INITIAL' ? 'inicial' : 'final'} removida com sucesso!`
-    })
-
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Erro ao remover foto:', error)
+    console.error('Erro ao deletar foto:', error)
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }
