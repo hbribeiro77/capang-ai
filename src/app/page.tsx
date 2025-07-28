@@ -7,12 +7,8 @@ export default function HomePage() {
       <div className="container mx-auto px-4 py-8">
         <div className="text-center mb-12">
           <h1 className="text-6xl font-bold text-orange-600 mb-4">
-            🍔 Capangai Food Challenge
+            🍔 Capang-AI Food Challenge
           </h1>
-          <p className="text-xl text-gray-600">
-            A competição mais saborosa da faculdade! 
-            Quem consegue comer mais?
-          </p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">

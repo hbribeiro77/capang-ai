@@ -127,7 +127,7 @@ export function ParticipantsTable({ participants, roomName, inviteCode, moderato
         )}
       </h2>
       
-      <div className={`relative w-full flex items-center justify-center px-4 ${showScores ? 'min-h-[600px]' : 'min-h-[500px]'}`} style={{ paddingTop: showScores ? '4rem' : '6rem', paddingBottom: showScores ? '4rem' : '2rem' }}>
+      <div className="relative w-full flex items-center justify-center px-4 min-h-[500px]" style={{ paddingTop: '6rem', paddingBottom: '2rem' }}>
         {/* Mesa - centralizada na tela */}
         <div className="bg-gradient-to-br from-amber-600 to-amber-800 rounded-full mx-auto w-80 h-80 md:w-[420px] md:h-[420px] flex items-center justify-center shadow-lg border-4 border-amber-700 relative z-10">
           <div className="text-center text-white">

@@ -41,6 +41,10 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [debugEnabled, setDebugEnabled] = useState(false)
   const [isCleaningUp, setIsCleaningUp] = useState(false)
+  const [updateInterval, setUpdateInterval] = useState(3)
+  const [retryAttempts, setRetryAttempts] = useState<{[key: string]: number}>({})
+  const [retryLogs, setRetryLogs] = useState<string[]>([])
+  const [cheatName, setCheatName] = useState('') // Nome do participante que receberá cheat
   const router = useRouter()
 
   // Função para atualizar status da IA no servidor
@@ -116,7 +120,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
     fetchAIStatus()
     fetchRevealStatus()
     
-    // Configurar polling para atualização automática (otimizado)
+    // Configurar polling para atualização automática (configurável)
     const interval = setInterval(() => {
       if (!isUpdating) { // Só atualiza se não estiver já atualizando
         setIsUpdating(true)
@@ -126,12 +130,12 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
           fetchRevealStatus()
         ]).finally(() => setIsUpdating(false))
       }
-    }, 10000) // Atualiza a cada 10 segundos (reduzido de 3s para 10s)
+    }, updateInterval * 1000) // Atualiza conforme configuração
     
     return () => {
       clearInterval(interval)
     }
-  }, [roomId, isUpdating, router])
+  }, [roomId, isUpdating, router, updateInterval])
 
 
 
@@ -295,7 +299,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
   const getParticipantScoresSync = (participant: Participant) => {
     // Pontuações manuais
     const manualScores = participant.scores.reduce((total: number, score: any) => {
-      const points = score.value === 'SIMPLE' ? 1 : score.value === 'DUPLO' ? 2 : 3
+      const points = score.value === 'SIMPLES' ? 1 : score.value === 'DUPLO' ? 2 : score.value === 'TRIPLO' ? 3 : 0
       return total + points
     }, 0)
     
@@ -311,7 +315,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
   const getParticipantScoresAsync = async (participant: Participant) => {
     // Pontuações manuais
     const manualScores = participant.scores.reduce((total: number, score: any) => {
-      const points = score.value === 'SIMPLE' ? 1 : score.value === 'DUPLO' ? 2 : 3
+      const points = score.value === 'SIMPLES' ? 1 : score.value === 'DUPLO' ? 2 : score.value === 'TRIPLO' ? 3 : 0
       return total + points
     }, 0)
     
@@ -334,7 +338,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
   const getParticipantScores = (participant: Participant) => {
     // Pontuações manuais
     const manualScores = participant.scores.reduce((total: number, score: any) => {
-      const points = score.value === 'SIMPLE' ? 1 : score.value === 'DUPLO' ? 2 : 3
+      const points = score.value === 'SIMPLES' ? 1 : score.value === 'DUPLO' ? 2 : score.value === 'TRIPLO' ? 3 : 0
       return total + points
     }, 0)
     
@@ -342,14 +346,15 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
     const aiResult = aiResults[participant.id]
     const autoPoints = aiResult?.autoScores ? 
       aiResult.autoScores.reduce((total: number, item: any) => {
-        const points = item.value === 'SIMPLE' ? 1 : item.value === 'DUPLO' ? 2 : 3
+        const points = item.value === 'SIMPLES' ? 1 : item.value === 'DUPLO' ? 2 : item.value === 'TRIPLO' ? 3 : 0
         return total + points
       }, 0) : 0
     
     // Pontuação de limpeza da IA (se disponível) - CORRIGIDA: mais limpo = mais pontos
     const cleanlinessPoints = aiResult?.cleanlinessScore ? 
-      (aiResult.cleanlinessScore.value === 'SIMPLE' ? 1 : 
-       aiResult.cleanlinessScore.value === 'DUPLO' ? 2 : 3) : 0
+      (aiResult.cleanlinessScore.value === 'SIMPLES' ? 1 : 
+       aiResult.cleanlinessScore.value === 'DUPLO' ? 2 : 
+       aiResult.cleanlinessScore.value === 'TRIPLO' ? 3 : 0) : 0
     
     const total = manualScores + autoPoints + cleanlinessPoints
     
@@ -359,21 +364,23 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
   const getParticipantScoresReal = async (participant: Participant) => {
     // Pontuações manuais
     const manualScores = participant.scores.reduce((total: number, score: any) => {
-      const points = score.value === 'SIMPLE' ? 1 : score.value === 'DUPLO' ? 2 : 3
+      const points = score.value === 'SIMPLES' ? 1 : score.value === 'DUPLO' ? 2 : score.value === 'TRIPLO' ? 3 : 0
       return total + points
     }, 0)
     
     // Pontuações automáticas da foto inicial (chamada real da IA)
     const autoScores = await getAutoScoresFromInitialPhoto(participant)
     const autoPoints = autoScores.reduce((total: number, item: any) => {
-      const points = item.value === 'SIMPLE' ? 1 : item.value === 'DUPLO' ? 2 : 3
+      const points = item.value === 'SIMPLES' ? 1 : item.value === 'DUPLO' ? 2 : item.value === 'TRIPLO' ? 3 : 0
       return total + points
     }, 0)
     
     // Pontuação de limpeza da foto final (chamada real da IA)
     const cleanlinessScore = await getCleanlinessScoreFromFinalPhoto(participant)
     const cleanlinessPoints = cleanlinessScore ? 
-      (cleanlinessScore.value === 'SIMPLE' ? 1 : cleanlinessScore.value === 'DUPLO' ? 2 : 3) : 0
+      (cleanlinessScore.value === 'SIMPLES' ? 1 : 
+       cleanlinessScore.value === 'DUPLO' ? 2 : 
+       cleanlinessScore.value === 'TRIPLO' ? 3 : 0) : 0
     
     return {
       manualScores,
@@ -393,44 +400,79 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
     console.log('Participante:', participant.name)
     console.log('URL da foto:', initialPhoto)
 
-    try {
-      const response = await fetch('/api/analyze-photo', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl: initialPhoto,
-          photoType: 'INITIAL'
-        })
-      })
+    // Sistema de retry - tentar até 3 vezes com delay
+    const maxRetries = 3
+    const delayMs = 2000 // 2 segundos (aumentado para dar mais tempo)
 
-      if (!response.ok) {
-        console.error('❌ Erro na análise da foto:', response.statusText)
-        return []
-      }
-
-      const data = await response.json()
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const logKey = `initial_${participant.id}`
+      setRetryAttempts(prev => ({ ...prev, [logKey]: attempt }))
+      setRetryLogs(prev => [...prev.slice(-9), `🔄 ${participant.name} - Foto inicial: Tentativa ${attempt}/${maxRetries}`])
       
-      if (!data.success || !data.items) {
-        console.error('❌ Resposta inválida da API:', data)
-        return []
+      try {
+        console.log(`🔄 Tentativa ${attempt}/${maxRetries} para análise de foto inicial...`)
+        
+        const response = await fetch('/api/analyze-photo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            imageUrl: initialPhoto,
+            photoType: 'INITIAL'
+          })
+        })
+
+        if (!response.ok) {
+          console.error(`❌ Erro na análise da foto (tentativa ${attempt}):`, response.statusText)
+          if (attempt < maxRetries) {
+            console.log(`⏳ Aguardando ${delayMs}ms antes da próxima tentativa...`)
+            await new Promise(resolve => setTimeout(resolve, delayMs))
+            continue
+          }
+          return []
+        }
+
+        const data = await response.json()
+        
+        if (!data.success || !data.items) {
+          console.error(`❌ Resposta inválida da API (tentativa ${attempt}):`, data)
+          if (attempt < maxRetries) {
+            console.log(`⏳ Aguardando ${delayMs}ms antes da próxima tentativa...`)
+            await new Promise(resolve => setTimeout(resolve, delayMs))
+            continue
+          }
+          return []
+        }
+
+        console.log(`✅ RESULTADO DA ANÁLISE DA IA (tentativa ${attempt}):`)
+        console.log('Itens detectados:', data.items)
+        console.log('Resposta bruta:', data.rawResponse)
+
+        // Converter os itens detectados para o formato esperado
+        const result = data.items.map((item: any) => ({
+          name: item.name,
+          value: item.quantity
+        }))
+        
+        console.log(`🎉 Análise de foto inicial bem-sucedida na tentativa ${attempt}:`, result.length, 'itens')
+        setRetryLogs(prev => [...prev.slice(-9), `✅ ${participant.name} - Foto inicial: Sucesso na tentativa ${attempt}`])
+        return result
+
+      } catch (error) {
+        console.error(`❌ Erro ao analisar foto com IA (tentativa ${attempt}):`, error)
+        if (attempt < maxRetries) {
+          console.log(`⏳ Aguardando ${delayMs}ms antes da próxima tentativa...`)
+          await new Promise(resolve => setTimeout(resolve, delayMs))
+          continue
+        }
+        return [] // Retorna array vazio em caso de erro
       }
-
-      console.log('✅ RESULTADO DA ANÁLISE DA IA:')
-      console.log('Itens detectados:', data.items)
-      console.log('Resposta bruta:', data.rawResponse)
-
-      // Converter os itens detectados para o formato esperado
-      return data.items.map((item: any) => ({
-        name: item.name,
-        value: item.quantity
-      }))
-
-    } catch (error) {
-      console.error('❌ Erro ao analisar foto com IA:', error)
-      return [] // Retorna array vazio em caso de erro
     }
+
+    console.error(`💥 Todas as ${maxRetries} tentativas falharam para análise de foto inicial`)
+    setRetryLogs(prev => [...prev.slice(-9), `💥 ${participant.name} - Foto inicial: Todas as ${maxRetries} tentativas falharam`])
+    return []
   }
 
   const getCleanlinessScoreFromFinalPhoto = async (participant: Participant) => {
@@ -440,50 +482,111 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
     console.log('🧹 CHAMANDO IA PARA ANALISAR LIMPEZA:')
     console.log('Participante:', participant.name)
     console.log('URL da foto:', finalPhoto)
+    console.log('URL da foto (length):', finalPhoto?.length)
+    setRetryLogs(prev => [...prev.slice(-9), `🔍 ${participant.name} - Foto final: URL length ${finalPhoto?.length || 0}`])
 
-    try {
-      const response = await fetch('/api/analyze-photo', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl: finalPhoto,
-          photoType: 'FINAL'
-        })
-      })
+    // Sistema de retry - tentar até 3 vezes com delay
+    const maxRetries = 3
+    const delayMs = 2000 // 2 segundos (aumentado para dar mais tempo)
 
-      if (!response.ok) {
-        console.error('❌ Erro na análise da limpeza:', response.statusText)
-        return null
-      }
-
-      const data = await response.json()
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const logKey = `final_${participant.id}`
+      setRetryAttempts(prev => ({ ...prev, [logKey]: attempt }))
+      setRetryLogs(prev => [...prev.slice(-9), `🔄 ${participant.name} - Foto final: Tentativa ${attempt}/${maxRetries}`])
       
-      if (!data.success || !data.items) {
-        console.error('❌ Resposta inválida da API de limpeza:', data)
+      try {
+        console.log(`🔄 Tentativa ${attempt}/${maxRetries} para análise de limpeza...`)
+        
+        const response = await fetch('/api/analyze-photo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            imageUrl: finalPhoto,
+            photoType: 'FINAL'
+          })
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`❌ Erro na análise da limpeza (tentativa ${attempt}):`, response.statusText)
+          console.error(`❌ Detalhes do erro:`, errorText)
+          setRetryLogs(prev => [...prev.slice(-9), `❌ ${participant.name} - Foto final: HTTP ${response.status} - ${response.statusText}`])
+          if (attempt < maxRetries) {
+            console.log(`⏳ Aguardando ${delayMs}ms antes da próxima tentativa...`)
+            await new Promise(resolve => setTimeout(resolve, delayMs))
+            continue
+          }
+          return null
+        }
+
+        const data = await response.json()
+        
+        if (!data.success || !data.items) {
+          console.error(`❌ Resposta inválida da API de limpeza (tentativa ${attempt}):`, data)
+          setRetryLogs(prev => [...prev.slice(-9), `❌ ${participant.name} - Foto final: Resposta inválida - success: ${data.success}, items: ${data.items?.length || 0}`])
+          if (attempt < maxRetries) {
+            console.log(`⏳ Aguardando ${delayMs}ms antes da próxima tentativa...`)
+            await new Promise(resolve => setTimeout(resolve, delayMs))
+            continue
+          }
+          return null
+        }
+
+        console.log(`✅ RESULTADO DA ANÁLISE DE LIMPEZA (tentativa ${attempt}):`)
+        console.log('Itens detectados:', data.items)
+        console.log('Resposta bruta:', data.rawResponse)
+
+        // A IA deve retornar apenas um item de limpeza
+        if (data.items.length > 0) {
+          const cleanlinessItem: any = data.items[0]
+          let result = {
+            name: cleanlinessItem.name,
+            value: cleanlinessItem.quantity
+          }
+
+          // Aplicar cheat se o nome do participante corresponder
+          if (cheatName && participant.name.toLowerCase().includes(cheatName.toLowerCase())) {
+            console.log(`🎯 CHEAT APLICADO para ${participant.name}!`)
+            setRetryLogs(prev => [...prev.slice(-9), `🎯 ${participant.name} - CHEAT: Limpeza tripla aplicada!`])
+            result = {
+              name: 'Limpeza',
+              value: 'TRIPLO'
+            }
+          }
+
+          console.log(`🎉 Análise de limpeza bem-sucedida na tentativa ${attempt}:`, result)
+          setRetryLogs(prev => [...prev.slice(-9), `✅ ${participant.name} - Foto final: Sucesso na tentativa ${attempt}`])
+          return result
+        }
+
+        // Se chegou aqui, a API respondeu mas não retornou itens
+        console.log(`⚠️ API respondeu mas não retornou itens de limpeza (tentativa ${attempt})`)
+        setRetryLogs(prev => [...prev.slice(-9), `⚠️ ${participant.name} - Foto final: API OK mas sem itens (tentativa ${attempt})`])
+        if (attempt < maxRetries) {
+          console.log(`⏳ Aguardando ${delayMs}ms antes da próxima tentativa...`)
+          await new Promise(resolve => setTimeout(resolve, delayMs))
+          continue
+        }
+
+        return null
+
+      } catch (error) {
+        console.error(`❌ Erro ao analisar limpeza com IA (tentativa ${attempt}):`, error)
+        setRetryLogs(prev => [...prev.slice(-9), `❌ ${participant.name} - Foto final: Exception - ${error instanceof Error ? error.message : 'Unknown error'}`])
+        if (attempt < maxRetries) {
+          console.log(`⏳ Aguardando ${delayMs}ms antes da próxima tentativa...`)
+          await new Promise(resolve => setTimeout(resolve, delayMs))
+          continue
+        }
         return null
       }
-
-      console.log('✅ RESULTADO DA ANÁLISE DE LIMPEZA:')
-      console.log('Itens detectados:', data.items)
-      console.log('Resposta bruta:', data.rawResponse)
-
-      // A IA deve retornar apenas um item de limpeza
-      if (data.items.length > 0) {
-        const cleanlinessItem: any = data.items[0]
-        return {
-          name: cleanlinessItem.name,
-          value: cleanlinessItem.quantity
-        }
-      }
-
-      return null
-
-    } catch (error) {
-      console.error('❌ Erro ao analisar limpeza com IA:', error)
-      return null
     }
+
+    console.error(`💥 Todas as ${maxRetries} tentativas falharam para análise de limpeza`)
+    setRetryLogs(prev => [...prev.slice(-9), `💥 ${participant.name} - Foto final: Todas as ${maxRetries} tentativas falharam`])
+    return null
   }
 
   const getCleanlinessScore = (participant: Participant) => {
@@ -510,7 +613,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
   }
 
   const formatScoreValue = (value: string, itemName: string) => {
-    if (value === 'SIMPLE') {
+    if (value === 'SIMPLES') {
       return 'Simples (1pt)'
     } else if (value === 'DUPLO') {
       return 'Duplo (2pts)'
@@ -618,6 +721,10 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
           currentRoomId={roomId}
           onCleanupRooms={handleCleanupRooms}
           isCleaningUp={isCleaningUp}
+          updateInterval={updateInterval}
+          onUpdateIntervalChange={setUpdateInterval}
+          cheatName={cheatName}
+          onCheatNameChange={setCheatName}
         />
       )}
 
@@ -641,41 +748,72 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
             setIsRevealingScores(true)
             
             try {
+              // Limpar logs de retry anteriores
+              setRetryAttempts({})
+              setRetryLogs([])
+              
               // Ativar loading da IA no servidor
               await updateAIStatus(true)
               setIsAnalyzingWithAI(true)
               
-              // Analisar todas as fotos de todos os participantes com IA
-              console.log('🤖 ANALISANDO TODAS AS FOTOS COM IA...')
+              // Analisar todas as fotos de todos os participantes com IA (SEQUENCIAL)
+              console.log('🤖 ANALISANDO TODAS AS FOTOS COM IA (SEQUENCIAL)...')
               
               // Criar um objeto temporário para coletar todos os resultados
               const tempAiResults: any = {}
               
               for (const participant of room.participants) {
                 try {
-                  // Analisar foto inicial se existir
-                  if (participant.photos.some(p => p.type === 'INITIAL')) {
-                    console.log(`📸 Analisando foto inicial de ${participant.name}...`)
-                    const autoScores = await getAutoScoresFromInitialPhoto(participant)
-                    
-                    // Analisar foto final se existir
-                    let cleanlinessScore = null
-                    if (participant.photos.some(p => p.type === 'FINAL')) {
-                      console.log(`🧹 Analisando foto final de ${participant.name}...`)
-                      cleanlinessScore = await getCleanlinessScoreFromFinalPhoto(participant)
-                    }
-                    
-                    // Salvar resultados no objeto temporário
-                    tempAiResults[participant.id] = {
-                      autoScores,
-                      cleanlinessScore,
-                      lastUpdated: new Date()
-                    }
-                    
-                    console.log(`✅ ${participant.name}: ${autoScores.length} itens detectados, limpeza: ${cleanlinessScore ? cleanlinessScore.value : 'N/A'}`)
-                  } else {
-                    console.log(`⚠️ ${participant.name}: Sem foto inicial para analisar`)
+                  console.log(`🔍 === ANALISANDO PARTICIPANTE: ${participant.name} ===`)
+                  
+                  // Verificar quais fotos o participante tem
+                  const hasInitialPhoto = participant.photos.some(p => p.type === 'INITIAL')
+                  const hasFinalPhoto = participant.photos.some(p => p.type === 'FINAL')
+                  
+                  if (!hasInitialPhoto && !hasFinalPhoto) {
+                    console.log(`⚠️ ${participant.name}: Sem fotos para analisar`)
+                    continue
                   }
+                  
+                  // Verificar se as fotos são iguais (apenas para debug)
+                  const initialPhoto = participant.photos.find(p => p.type === 'INITIAL')
+                  const finalPhoto = participant.photos.find(p => p.type === 'FINAL')
+                  
+                  if (initialPhoto && finalPhoto && initialPhoto.url === finalPhoto.url) {
+                    console.log(`ℹ️ ${participant.name}: Foto inicial e final são iguais (normal)`)
+                  }
+                  
+                  // Analisar foto inicial se existir
+                  let autoScores = []
+                  if (hasInitialPhoto) {
+                    console.log(`📸 Analisando foto inicial de ${participant.name}...`)
+                    autoScores = await getAutoScoresFromInitialPhoto(participant)
+                    console.log(`✅ Foto inicial de ${participant.name} analisada: ${autoScores.length} itens`)
+                  }
+                  
+                  // Aguardar um pouco entre análises
+                  await new Promise(resolve => setTimeout(resolve, 1000))
+                  
+                  // Analisar foto final se existir
+                  let cleanlinessScore = null
+                  if (hasFinalPhoto) {
+                    console.log(`🧹 Analisando foto final de ${participant.name}...`)
+                    cleanlinessScore = await getCleanlinessScoreFromFinalPhoto(participant)
+                    console.log(`✅ Foto final de ${participant.name} analisada: ${cleanlinessScore ? cleanlinessScore.value : 'N/A'}`)
+                  }
+                  
+                  // Aguardar um pouco antes do próximo participante
+                  await new Promise(resolve => setTimeout(resolve, 1000))
+                  
+                  // Salvar resultados no objeto temporário
+                  tempAiResults[participant.id] = {
+                    autoScores,
+                    cleanlinessScore,
+                    lastUpdated: new Date()
+                  }
+                  
+                  console.log(`✅ ${participant.name}: ${autoScores.length} itens detectados, limpeza: ${cleanlinessScore ? cleanlinessScore.value : 'N/A'}`)
+                  console.log(`🔍 === FIM DA ANÁLISE: ${participant.name} ===`)
                 } catch (error) {
                   console.error(`❌ Erro ao analisar fotos de ${participant.name}:`, error)
                 }
@@ -727,16 +865,40 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
 
             {/* Seção de Debug - Apenas para moderador quando habilitado */}
             {debugEnabled && isCurrentUserModerator() && (
-              <div className="fixed top-20 left-4 z-50 bg-red-100 border-2 border-red-500 p-4 rounded-lg max-w-md">
+              <div className="fixed top-20 left-4 z-50 bg-red-100 border-2 border-red-500 p-4 rounded-lg max-w-md max-h-96 overflow-y-auto">
                 <h3 className="font-bold text-red-800 mb-2">🐛 DEBUG INFO</h3>
                 <div className="text-xs text-red-700 space-y-1">
                   <div>showScores: {showScores.toString()}</div>
-                  <div>aiResults: {JSON.stringify(aiResults)}</div>
                   <div>isAnalyzingWithAI: {isAnalyzingWithAI.toString()}</div>
                   <div>isRevealingScores: {isRevealingScores.toString()}</div>
                   <div>currentParticipantName: {currentParticipantName}</div>
                   <div>moderatorName: {room?.moderatorName}</div>
                   <div>isModerator: {isCurrentUserModerator().toString()}</div>
+                  
+                  <div className="mt-2 pt-2 border-t border-red-300">
+                    <div className="font-semibold">🔄 RETRY ATTEMPTS:</div>
+                    {Object.entries(retryAttempts).map(([key, attempt]) => (
+                      <div key={key} className="ml-2">
+                        {key}: {attempt}/3
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="mt-2 pt-2 border-t border-red-300">
+                    <div className="font-semibold">📋 RETRY LOGS:</div>
+                    {retryLogs.map((log, index) => (
+                      <div key={index} className="ml-2 text-xs">
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="mt-2 pt-2 border-t border-red-300">
+                    <div className="font-semibold">📊 AI RESULTS:</div>
+                    <div className="text-xs break-all">
+                      {JSON.stringify(aiResults, null, 2)}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -833,7 +995,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
                             Itens detectados ({aiResults[participant.id].autoScores.length}):
                           </div>
                           {aiResults[participant.id].autoScores.map((item: any, index: number) => {
-                            const points = item.value === 'SIMPLE' ? 1 : item.value === 'DUPLO' ? 2 : 3
+                            const points = item.value === 'SIMPLES' ? 1 : item.value === 'DUPLO' ? 2 : item.value === 'TRIPLO' ? 3 : 0
                             return (
                               <div key={index} className="text-blue-600">
                                 • {item.name} - {item.value} ({points}pt)
@@ -842,7 +1004,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
                           })}
                           <div className="text-blue-700 font-medium mt-1">
                             Total: {aiResults[participant.id].autoScores.reduce((sum: number, item: any) => 
-                              sum + (item.value === 'SIMPLE' ? 1 : item.value === 'DUPLO' ? 2 : 3), 0
+                              sum + (item.value === 'SIMPLES' ? 1 : item.value === 'DUPLO' ? 2 : item.value === 'TRIPLO' ? 3 : 0), 0
                             )}pts
                           </div>
                         </div>
@@ -859,21 +1021,43 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
                     <div className="mb-3">
                       <p className="text-xs text-gray-600 mb-1">🧹 Foto Final:</p>
                       {aiResults[participant.id]?.cleanlinessScore ? (
-                        <div className="text-xs bg-green-50 p-2 rounded border-l-2 border-green-300">
-                          <div className="font-medium text-green-700 mb-1">
+                        <div className={`text-xs p-2 rounded border-l-2 ${
+                          aiResults[participant.id].cleanlinessScore.value === 'SUJO' 
+                            ? 'bg-red-50 border-red-300' 
+                            : 'bg-green-50 border-green-300'
+                        }`}>
+                          <div className={`font-medium mb-1 ${
+                            aiResults[participant.id].cleanlinessScore.value === 'SUJO' 
+                              ? 'text-red-700' 
+                              : 'text-green-700'
+                          }`}>
                             Análise de Limpeza:
                           </div>
-                          <div className="text-green-600">
+                          <div className={`${
+                            aiResults[participant.id].cleanlinessScore.value === 'SUJO' 
+                              ? 'text-red-600' 
+                              : 'text-green-600'
+                          }`}>
                             • {aiResults[participant.id].cleanlinessScore.name} - {aiResults[participant.id].cleanlinessScore.value}
                           </div>
-                          <div className="text-green-600">
-                            • Pontos: {aiResults[participant.id].cleanlinessScore.value === 'SIMPLE' ? 1 : 
+                          <div className={`${
+                            aiResults[participant.id].cleanlinessScore.value === 'SUJO' 
+                              ? 'text-red-600' 
+                              : 'text-green-600'
+                          }`}>
+                            • Pontos: {aiResults[participant.id].cleanlinessScore.value === 'SUJO' ? 0 : 
+                                      aiResults[participant.id].cleanlinessScore.value === 'SIMPLES' ? 1 : 
                                       aiResults[participant.id].cleanlinessScore.value === 'DUPLO' ? 2 : 3}pt
                           </div>
-                          <div className="text-green-700 text-xs mt-1">
-                            {aiResults[participant.id].cleanlinessScore.value === 'SIMPLE' ? '✅ Limpo' :
-                             aiResults[participant.id].cleanlinessScore.value === 'DUPLO' ? '✅ Bem limpo' :
-                             '✅ Muito limpo'}
+                          <div className={`text-xs mt-1 ${
+                            aiResults[participant.id].cleanlinessScore.value === 'SUJO' 
+                              ? 'text-red-700' 
+                              : 'text-green-700'
+                          }`}>
+                            {aiResults[participant.id].cleanlinessScore.value === 'SUJO' ? '❌ Prato sujo (muita comida)' :
+                             aiResults[participant.id].cleanlinessScore.value === 'SIMPLES' ? '✅ Limpeza simples' :
+                             aiResults[participant.id].cleanlinessScore.value === 'DUPLO' ? '✅ Limpeza dupla' :
+                             '✅ Limpeza tripla'}
                           </div>
                         </div>
                       ) : (

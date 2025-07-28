@@ -16,6 +16,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Verificar se a URL é muito longa (base64)
+    if (imageUrl.length > 100000) {
+      console.log('⚠️ URL muito longa detectada (base64), pode causar problemas')
+      console.log('📏 Tamanho da URL:', imageUrl.length, 'caracteres')
+    }
+
     console.log('🔑 Verificando API key...')
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
@@ -50,7 +56,7 @@ INSTRUÇÕES:
 1. Analise a foto cuidadosamente
 2. Liste TODOS os itens de comida que você consegue identificar claramente
 3. Para cada item, indique a quantidade:
-   - SIMPLE: quantidade normal (1 ponto)
+   - SIMPLES: quantidade normal (1 ponto)
    - DUPLO: quantidade maior que o normal (2 pontos)
    - TRIPLO: quantidade muito maior que o normal (3 pontos)
 
@@ -59,42 +65,46 @@ RESPONDA APENAS NO FORMATO JSON:
   "items": [
     {
       "name": "nome_do_item",
-      "quantity": "SIMPLE|DUPLO|TRIPLO"
+      "quantity": "SIMPLES|DUPLO|TRIPLO"
     }
   ]
 }
 
 Se não conseguir identificar nenhum item claramente, retorne um array vazio.`
-      : `Você é um especialista em análise de limpeza de pratos após refeições. Analise a foto do prato e avalie o nível de limpeza.
+      : `Você é um especialista em análise de limpeza de pratos após refeições. Analise a foto e avalie o nível de limpeza.
 
 INSTRUÇÕES:
-1. Analise a foto do prato cuidadosamente
+1. Analise a foto cuidadosamente - pode ser um prato, bandeja, mesa, etc.
 2. Avalie quantos resíduos de comida ainda estão visíveis
 3. Determine o nível de limpeza:
-   - SIMPLE: prato limpo, poucos resíduos (1 ponto)
-   - DUPLO: prato bem limpo, muito poucos resíduos (2 pontos)
-   - TRIPLO: prato muito limpo, praticamente sem resíduos (3 pontos)
-   - Se o prato estiver muito sujo, não retorne nenhum item
+   - SUJO: muita comida não consumida ou muita sujeira (0 pontos)
+   - SIMPLES: poucos resíduos visíveis (1 ponto)
+   - DUPLO: bem limpo, muito poucos resíduos (2 pontos)
+   - TRIPLO: muito limpo, praticamente sem resíduos (3 pontos)
 
-RESPONDA APENAS NO FORMATO JSON:
+IMPORTANTE: SEMPRE retorne uma resposta, mesmo quando o prato está sujo.
+
+RESPONDA NO FORMATO JSON:
 {
   "items": [
     {
       "name": "Limpeza",
-      "quantity": "SIMPLE|DUPLO|TRIPLO"
+      "quantity": "SUJO|SIMPLES|DUPLO|TRIPLO"
     }
   ]
 }
 
-Se o prato estiver muito sujo ou não conseguir avaliar a limpeza, retorne um array vazio.`
+NUNCA retorne array vazio. Sempre retorne uma resposta com o nível de limpeza.`
 
     const userPrompt = photoType === 'INITIAL'
       ? 'Analise esta foto da refeição/lanche. Identifique TODOS os itens de comida visíveis, incluindo ingredientes, acompanhamentos, bebidas e qualquer outro alimento que você conseguir detectar.'
-      : 'Analise esta foto do prato após a refeição. Avalie cuidadosamente a limpeza do prato, considerando quantos resíduos de comida ainda estão visíveis. Quanto mais limpo o prato, melhor a pontuação.'
+      : 'Analise esta foto APÓS a refeição. Avalie a limpeza da superfície (prato, bandeja, mesa, etc.). SEMPRE retorne uma resposta: SUJO (0pts) se tem muita comida/sujeira, SIMPLES (1pt) se tem pouca sujeira, DUPLO (2pts) se está bem limpo, TRIPLO (3pts) se está muito limpo.'
 
     console.log('🤖 CHAMANDO OPENAI...')
     console.log('Modelo:', "gpt-4o-mini")
-    console.log('URL da imagem:', imageUrl.substring(0, 100) + '...')
+    console.log('URL da imagem (início):', imageUrl.substring(0, 100) + '...')
+    console.log('URL da imagem (fim):', '...' + imageUrl.substring(imageUrl.length - 100))
+    console.log('📸 Tipo de foto sendo analisada:', photoType)
 
     const openai = getOpenAI()
     const response = await openai.chat.completions.create({
@@ -130,8 +140,16 @@ Se o prato estiver muito sujo ou não conseguir avaliar a limpeza, retorne um ar
       throw new Error('Resposta vazia da OpenAI')
     }
 
+    // Verificar se a IA menciona algo sobre a imagem
+    const lowerContent = content.toLowerCase()
+    const mentionsImage = lowerContent.includes('imagem') || lowerContent.includes('foto') || lowerContent.includes('prato') || lowerContent.includes('comida')
+    console.log('🔍 IA menciona imagem/comida:', mentionsImage)
+    console.log('🔍 Conteúdo da resposta (primeiros 200 chars):', content.substring(0, 200))
+
     console.log('🤖 RESPOSTA DA IA:')
     console.log('Raw response:', content)
+    console.log('📏 Tamanho da resposta:', content.length, 'caracteres')
+    console.log('🔍 Tipo de foto:', photoType)
 
     // Tentar fazer parse do JSON da resposta
     let detectedItems = []
@@ -139,18 +157,23 @@ Se o prato estiver muito sujo ou não conseguir avaliar a limpeza, retorne um ar
       // Limpar a resposta de markdown se necessário
       let cleanContent = content.trim()
       
+      console.log('🔍 Conteúdo original da IA:', content)
+      
       // Se a resposta começa com ```json, remover o markdown
       if (cleanContent.startsWith('```json')) {
         cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+        console.log('🧹 Removido markdown JSON')
       }
       // Se a resposta começa com ```, remover o markdown
       else if (cleanContent.startsWith('```')) {
         cleanContent = cleanContent.replace(/^```\s*/, '').replace(/\s*```$/, '')
+        console.log('🧹 Removido markdown genérico')
       }
       
       console.log('🧹 Conteúdo limpo:', cleanContent)
       
       const parsed = JSON.parse(cleanContent)
+      console.log('✅ JSON parseado com sucesso:', parsed)
       detectedItems = parsed.items || []
       console.log('✅ Itens detectados pela IA:')
       detectedItems.forEach((item: any, index: number) => {
@@ -159,8 +182,30 @@ Se o prato estiver muito sujo ou não conseguir avaliar a limpeza, retorne um ar
     } catch (error) {
       console.error('❌ Erro ao fazer parse da resposta:', content)
       console.error('Erro:', error)
-      // Fallback: tentar extrair informações do texto
-      detectedItems = []
+      console.error('🔍 Tentando extrair JSON manualmente...')
+      
+      // Tentar extrair JSON manualmente
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        try {
+          const manualParsed = JSON.parse(jsonMatch[0])
+          detectedItems = manualParsed.items || []
+          console.log('✅ JSON extraído manualmente:', manualParsed)
+        } catch (manualError) {
+          console.error('❌ Erro no parse manual:', manualError)
+          detectedItems = []
+        }
+      } else {
+        detectedItems = []
+      }
+    }
+
+    if (detectedItems.length === 0) {
+      console.log('⚠️ NENHUM ITEM DETECTADO!')
+      console.log('🔍 Tipo de foto:', photoType)
+      console.log('📏 Tamanho da URL:', imageUrl.length)
+      console.log('📄 Resposta completa da IA:', content)
+      console.log('📄 Resposta da IA (primeiros 500 chars):', content.substring(0, 500))
     }
 
     console.log('📊 Total de itens detectados:', detectedItems.length)
