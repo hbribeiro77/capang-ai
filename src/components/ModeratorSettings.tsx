@@ -7,6 +7,9 @@ interface ModeratorSettingsProps {
   debugEnabled: boolean
   onToggleDebug: (enabled: boolean) => void
   showButton?: boolean
+  currentRoomId?: string
+  onCleanupRooms?: () => void
+  isCleaningUp?: boolean
 }
 
 export function ModeratorSettings({ 
@@ -14,7 +17,10 @@ export function ModeratorSettings({
   onClose, 
   debugEnabled, 
   onToggleDebug,
-  showButton = true
+  showButton = true,
+  currentRoomId,
+  onCleanupRooms,
+  isCleaningUp = false
 }: ModeratorSettingsProps) {
   return (
     <>
@@ -73,6 +79,39 @@ export function ModeratorSettings({
                       />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
                     </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção de Limpeza de Salas */}
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  🧹 Limpeza
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Limpar Salas Antigas</p>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Remove todas as salas exceto a atual para melhorar performance
+                    </p>
+                    <button
+                      onClick={onCleanupRooms}
+                      disabled={isCleaningUp}
+                      className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        isCleaningUp
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-red-500 hover:bg-red-600 text-white hover:scale-105'
+                      }`}
+                    >
+                      {isCleaningUp ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Limpando...
+                        </span>
+                      ) : (
+                        '🗑️ Limpar Todas as Salas (Exceto Atual)'
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>

@@ -15,7 +15,6 @@ interface RoomDashboardProps {
 }
 
 export function RoomDashboard({ roomId }: RoomDashboardProps) {
-  console.log('🔍 RoomDashboard renderizado com roomId:', roomId)
   
   const [room, setRoom] = useState<Room | null>(null)
   const [loading, setLoading] = useState(true)
@@ -41,6 +40,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
   const [isRevealingScores, setIsRevealingScores] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [debugEnabled, setDebugEnabled] = useState(false)
+  const [isCleaningUp, setIsCleaningUp] = useState(false)
   const router = useRouter()
 
   // Função para atualizar status da IA no servidor
@@ -65,7 +65,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
         setIsAnalyzingWithAI(data.aiAnalyzing || false)
       }
     } catch (error) {
-      console.error('Erro ao buscar status da IA:', error)
+      // Silenciar erro para reduzir logs
     }
   }
 
@@ -79,16 +79,11 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
         
         // Se as pontuações foram reveladas, carregar os resultados da IA
         if (data.scoresRevealed && data.aiResults && Object.keys(data.aiResults).length > 0) {
-          console.log('📊 Carregando resultados da IA do servidor...')
-          console.log('📊 Dados do servidor:', data.aiResults)
           setAiResults(data.aiResults)
-        } else if (data.scoresRevealed && (!data.aiResults || Object.keys(data.aiResults).length === 0)) {
-          console.log('⚠️ Pontuações reveladas mas sem resultados da IA no servidor')
-          console.log('⚠️ Mantendo resultados locais:', aiResults)
         }
       }
     } catch (error) {
-      console.error('Erro ao buscar status de revelação:', error)
+      // Silenciar erro para reduzir logs
     }
   }
 
@@ -110,9 +105,7 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
     if (participantId && participantName) {
       setCurrentParticipantId(participantId)
       setCurrentParticipantName(participantName)
-      console.log('Usuário identificado:', { id: participantId, name: participantName })
     } else {
-      console.log('Usuário não identificado, redirecionando para registro...')
       router.push(`/room/${roomId}/join`)
       return
     }
@@ -123,18 +116,17 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
     fetchAIStatus()
     fetchRevealStatus()
     
-    // Configurar polling para atualização automática
+    // Configurar polling para atualização automática (otimizado)
     const interval = setInterval(() => {
       if (!isUpdating) { // Só atualiza se não estiver já atualizando
-        console.log('🔄 Atualização automática da sala...')
         setIsUpdating(true)
         Promise.all([
           fetchRoom(),
           fetchAIStatus(),
-          fetchRevealStatus() // Adicionar verificação de revelação
+          fetchRevealStatus()
         ]).finally(() => setIsUpdating(false))
       }
-    }, 3000) // Atualiza a cada 3 segundos
+    }, 10000) // Atualiza a cada 10 segundos (reduzido de 3s para 10s)
     
     return () => {
       clearInterval(interval)
@@ -145,40 +137,25 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
 
   const fetchRoom = async () => {
     try {
-      console.log('=== FETCHING ROOM ===')
-      console.log('RoomId:', roomId)
-      
       const response = await fetch(`/api/rooms/${roomId}`)
       if (response.ok) {
         const data = await response.json()
-        console.log('Dados da sala carregados:', data.room)
-        console.log('Participantes:', data.room.participants)
         
-        // Log detalhado das fotos de cada participante
-        data.room.participants.forEach((participant: any) => {
-          console.log(`Participante ${participant.name}:`, {
-            id: participant.id,
-            photosCount: participant.photos.length,
-            photos: participant.photos
-          })
-        })
-        
-        // Verificar se houve mudanças antes de atualizar
+        // Verificar se houve mudanças antes de atualizar (otimizado)
         const hasChanges = !room || 
           room.participants.length !== data.room.participants.length ||
-          JSON.stringify(room.participants.map((p: Participant) => ({ id: p.id, photos: p.photos.length }))) !== 
-          JSON.stringify(data.room.participants.map((p: any) => ({ id: p.id, photos: p.photos.length })))
+          room.participants.some((p: Participant, index: number) => 
+            p.id !== data.room.participants[index]?.id || 
+            p.photos.length !== data.room.participants[index]?.photos.length
+          )
         
         if (hasChanges) {
-          console.log('Mudanças detectadas, atualizando estado da sala...')
-          
           // Verificar se há novos participantes
           if (room && data.room.participants.length > room.participants.length) {
             const newParticipants = data.room.participants.filter((p: any) => 
               !room.participants.some(existing => existing.id === p.id)
             )
             if (newParticipants.length > 0) {
-              console.log('Novos participantes detectados:', newParticipants.map((p: any) => p.name))
               // Mostrar notificação
               if (typeof window !== 'undefined' && 'Notification' in window) {
                 newParticipants.forEach((participant: any) => {
@@ -192,19 +169,14 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
           }
           
           setRoom(data.room)
-          console.log('Estado da sala atualizado')
           
           // Se há um participante selecionado, atualizar com os novos dados
           if (selectedParticipant) {
-            console.log('Atualizando participante selecionado com novos dados...')
             const updatedSelectedParticipant = data.room.participants.find((p: any) => p.id === selectedParticipant.id)
             if (updatedSelectedParticipant) {
-              console.log('Participante selecionado atualizado com novos dados:', updatedSelectedParticipant)
               setSelectedParticipant(updatedSelectedParticipant)
             }
           }
-        } else {
-          console.log('Nenhuma mudança detectada, mantendo estado atual')
         }
       } else {
         setError('Sala não encontrada')
@@ -223,10 +195,6 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
   }
 
   const handlePhotoUpload = async (participantId: string, photoType: 'INITIAL' | 'FINAL', file: File) => {
-    console.log('=== HANDLE PHOTO UPLOAD INICIADO ===')
-    console.log('Participant ID:', participantId)
-    console.log('Photo Type:', photoType)
-    console.log('File:', file.name, file.size)
     
     setUploadingPhoto(`${participantId}-${photoType}`)
     
@@ -235,7 +203,6 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
       formData.append('photo', file)
       formData.append('type', photoType)
 
-      console.log('Enviando requisição para API...')
       const response = await fetch(`/api/rooms/${roomId}/participants/${participantId}/photos`, {
         method: 'POST',
         body: formData
@@ -243,20 +210,14 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
 
       if (response.ok) {
         const data = await response.json()
-        console.log('Foto enviada com sucesso:', data)
         
-        console.log('Recarregando dados da sala...')
         await fetchRoom()
-        console.log('Dados da sala recarregados')
         
         // Atualizar o participante selecionado se necessário
         if (selectedParticipant && selectedParticipant.id === participantId) {
-          console.log('Atualizando participante selecionado...')
           const updatedParticipant = room?.participants.find(p => p.id === participantId)
-          console.log('Participante atualizado encontrado:', updatedParticipant)
           if (updatedParticipant) {
             setSelectedParticipant(updatedParticipant)
-            console.log('Participante selecionado atualizado')
           }
         }
       } else {
@@ -269,7 +230,6 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
       alert('Erro ao enviar foto')
     } finally {
       setUploadingPhoto(null)
-      console.log('=== HANDLE PHOTO UPLOAD FINALIZADO ===')
     }
   }
 
@@ -288,7 +248,6 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
       })
 
       if (response.ok) {
-        console.log('Foto removida com sucesso')
         await fetchRoom()
         // Atualizar o participante selecionado se necessário
         if (selectedParticipant && selectedParticipant.id === participantId) {
@@ -308,20 +267,15 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
   }
 
   const handleRefreshParticipant = async (participantId: string): Promise<Participant | null> => {
-    console.log('=== REFRESH PARTICIPANT ===')
-    console.log('Participant ID:', participantId)
-    
     try {
       // Recarregar dados da sala
       await fetchRoom()
       
       // Encontrar o participante atualizado
       const updatedParticipant = room?.participants.find(p => p.id === participantId)
-      console.log('Participante atualizado encontrado:', updatedParticipant)
       
       if (updatedParticipant) {
         setSelectedParticipant(updatedParticipant)
-        console.log('Participante selecionado atualizado')
         return updatedParticipant
       }
       
@@ -334,7 +288,6 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
 
   const getParticipantPhoto = (participant: Participant, type: 'INITIAL' | 'FINAL') => {
     const photo = participant.photos.find(photo => photo.type === type)
-    console.log(`Foto ${type} encontrada para ${participant.name}:`, photo)
     return photo?.url || undefined // Retorna a URL da foto ou undefined
   }
 
@@ -571,6 +524,35 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
     return currentParticipantName === room?.moderatorName
   }
 
+  // Função para limpar todas as salas exceto a atual
+  const handleCleanupRooms = async () => {
+    if (!confirm('Tem certeza que deseja remover todas as salas exceto a atual? Esta ação não pode ser desfeita.')) {
+      return
+    }
+
+    setIsCleaningUp(true)
+    try {
+      const response = await fetch('/api/rooms/cleanup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentRoomId: roomId })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        alert(`Limpeza concluída!\n\nRemovidos:\n- ${data.stats.removedRooms} salas\n- ${data.stats.removedParticipants} participantes\n- ${data.stats.removedPhotos} fotos\n- ${data.stats.removedScores} pontuações\n\nMantidos:\n- ${data.stats.keptRooms} sala atual\n- ${data.stats.keptParticipants} participantes\n- ${data.stats.keptPhotos} fotos\n- ${data.stats.keptScores} pontuações`)
+      } else {
+        const error = await response.json()
+        alert(`Erro na limpeza: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Erro ao limpar salas:', error)
+      alert('Erro ao limpar salas. Tente novamente.')
+    } finally {
+      setIsCleaningUp(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -633,6 +615,9 @@ export function RoomDashboard({ roomId }: RoomDashboardProps) {
           debugEnabled={debugEnabled}
           onToggleDebug={setDebugEnabled}
           showButton={false}
+          currentRoomId={roomId}
+          onCleanupRooms={handleCleanupRooms}
+          isCleaningUp={isCleaningUp}
         />
       )}
 
